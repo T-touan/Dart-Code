@@ -40,6 +40,7 @@ export class LspTestCodeLensProvider implements CodeLensProvider, IAmDisposable 
 		const templates = getTemplatedLaunchConfigs(document.uri, "test");
 		const templatesHaveRun = !!templates.find((t) => t.name === "Run");
 		const templatesHaveDebug = !!templates.find((t) => t.name === "Debug");
+		const templatesHaveCoverage = !!templates.find((t) => t.name === "Coverage");
 
 		const visitor = new LspTestOutlineVisitor(this.logger, fsPath(document.uri));
 		visitor.visit(outline);
@@ -49,21 +50,28 @@ export class LspTestCodeLensProvider implements CodeLensProvider, IAmDisposable 
 				.map((test) => {
 					const results: CodeLens[] = [];
 					if (!templatesHaveRun)
-						results.push(this.createCodeLens(document, test, "Run", false));
+						results.push(this.createCodeLens(document, test, "Run", false, false));
 					if (!templatesHaveDebug)
-						results.push(this.createCodeLens(document, test, "Debug", true));
-					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, t)));
+						results.push(this.createCodeLens(document, test, "Debug", true, false));
+					if (!templatesHaveCoverage)
+						results.push(this.createCodeLens(document, test, "Coverage", false, true));
+					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, t.withCoverage, t)));
 				}),
 			(x) => x,
 		);
 	}
 
-	private createCodeLens(document: TextDocument, test: LspTestOutlineInfo, name: string, debug: boolean, template?: { name: string }): CodeLens {
+	private createCodeLens(document: TextDocument, test: LspTestOutlineInfo, name: string, debug: boolean, coverage: boolean, template?: { name: string }): CodeLens {
+		const command = debug ?
+			"_dart.startDebuggingTestFromOutline"
+			: coverage
+				? "_dart.startWithoutDebuggingWithCoverageTestFromOutline"
+				: "_dart.startWithoutDebuggingTestFromOutline";
 		return new CodeLens(
 			lspToRange(test.range),
 			{
 				arguments: template ? [test, template] : [test],
-				command: debug ? "_dart.startDebuggingTestFromOutline" : "_dart.startWithoutDebuggingTestFromOutline",
+				command,
 				title: name,
 			}
 		);

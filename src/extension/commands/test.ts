@@ -233,7 +233,7 @@ export class TestCommands implements vs.Disposable {
 				resolve(false);
 
 			}
-		}).finally(() => {
+		}).finally( () => {
 			disposeAll(subs);
 		});
 	}

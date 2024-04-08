@@ -78,6 +78,7 @@ export interface TemplatedLaunchConfig {
 	name: string;
 	type?: string;
 	noDebug?: boolean;
+	withCoverage: boolean;
 	templateFor?: string; // path to apply to
 	codeLens?: {
 		for: string | string[];

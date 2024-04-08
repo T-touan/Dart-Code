@@ -40,6 +40,7 @@ export class TestCodeLensProvider implements CodeLensProvider, IAmDisposable {
 		const templates = getTemplatedLaunchConfigs(document.uri, "test");
 		const templatesHaveRun = !!templates.find((t) => t.name === "Run");
 		const templatesHaveDebug = !!templates.find((t) => t.name === "Debug");
+		const templatesHaveCoverage = !!templates.find((t) => t.name === "Coverage");
 
 		const visitor = new TestOutlineVisitor(this.logger);
 		visitor.visit(outline);
@@ -52,7 +53,9 @@ export class TestCodeLensProvider implements CodeLensProvider, IAmDisposable {
 						results.push(this.createCodeLens(document, test, "Run", false, false));
 					if (!templatesHaveDebug)
 						results.push(this.createCodeLens(document, test, "Debug", true, false));
-					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, false, t)));
+					if (!templatesHaveCoverage)
+						results.push(this.createCodeLens(document, test, "Coverage", false, true));
+					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, t.withCoverage, t)));
 				}),
 			(x) => x,
 		);
