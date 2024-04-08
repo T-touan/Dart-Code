@@ -35,6 +35,9 @@ export class VsCodeTestController implements TestEventListener, IAmDisposable {
 
 		controller.createRunProfile("Debug", vs.TestRunProfileKind.Debug, (request, token) =>
 			this.runTests(true, request, token), true, runnableTestTag);
+
+		controller.createRunProfile("Run with coverage", vs.TestRunProfileKind.Coverage, (request, token) =>
+			this.runTests(true, request, token), true, runnableTestTag);
 	}
 
 	private async resolveTestItem(item: vs.TestItem | undefined): Promise<void> {
@@ -70,6 +73,7 @@ export class VsCodeTestController implements TestEventListener, IAmDisposable {
 
 		const testsToRun = new Set<vs.TestItem>();
 		const testsToExclude = new Set<vs.TestItem>();
+		const withCoverage = request.profile?.kind === vs.TestRunProfileKind.Coverage;
 		const isRunningAll = !request.include?.length;
 		(request.include ?? this.controller.items).forEach((item) => testsToRun.add(item));
 		request.exclude?.forEach((item) => { testsToRun.delete(item); testsToExclude.add(item); });
@@ -88,7 +92,10 @@ export class VsCodeTestController implements TestEventListener, IAmDisposable {
 			const nodesToRun = [...testsToRun].map((item) => this.nodeForItem.get(item));
 			const nodesToExclude = [...testsToExclude].map((item) => this.nodeForItem.get(item));
 			if (!debug && nodesToRun.every((item) => item instanceof SuiteNode) && nodesToExclude.every((item) => item instanceof SuiteNode)) {
-				await vs.commands.executeCommand("_dart.runAllTestsWithoutDebugging", nodesToRun, nodesToExclude, run, isRunningAll);
+				const command = withCoverage
+					? "_dart.runAllTestsWithoutDebuggingWithCoverage"
+					: "_dart.runAllTestsWithoutDebugging";
+				await vs.commands.executeCommand(command, nodesToRun, nodesToExclude, run, isRunningAll);
 				return;
 			}
 
@@ -109,9 +116,11 @@ export class VsCodeTestController implements TestEventListener, IAmDisposable {
 				const nodes = testsBySuite.get(suite);
 				if (!nodes) continue;
 
-				const command = debug
-					? "_dart.startDebuggingTestsFromVsTestController"
-					: "_dart.startWithoutDebuggingTestsFromVsTestController";
+				const command = withCoverage
+					? "_dart.startWithoutDebuggingWithCoverageTestsFromVsTestController"
+					: debug
+						? "_dart.startDebuggingTestsFromVsTestController"
+						: "_dart.startWithoutDebuggingTestsFromVsTestController";
 				await vs.commands.executeCommand(command, suite, nodes, suppressPrompts, run);
 			}
 		} finally {

@@ -49,21 +49,26 @@ export class TestCodeLensProvider implements CodeLensProvider, IAmDisposable {
 				.map((test) => {
 					const results: CodeLens[] = [];
 					if (!templatesHaveRun)
-						results.push(this.createCodeLens(document, test, "Run", false));
+						results.push(this.createCodeLens(document, test, "Run", false, false));
 					if (!templatesHaveDebug)
-						results.push(this.createCodeLens(document, test, "Debug", true));
-					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, t)));
+						results.push(this.createCodeLens(document, test, "Debug", true, false));
+					return results.concat(templates.map((t) => this.createCodeLens(document, test, t.name, !t.noDebug, false, t)));
 				}),
 			(x) => x,
 		);
 	}
 
-	private createCodeLens(document: TextDocument, test: DasTestOutlineInfo, name: string, debug: boolean, template?: { name: string }): CodeLens {
+	private createCodeLens(document: TextDocument, test: DasTestOutlineInfo, name: string, debug: boolean, coverage: boolean, template?: { name: string }): CodeLens {
+		const command = coverage
+			? "_dart.startWithoutDebuggingWithCoverageTestFromOutline"
+			: debug
+				? "_dart.startTestFromOutline"
+				: "_dart.startWithoutDebuggingTestFromOutline";
 		return new CodeLens(
 			toRange(document, test.offset, test.length),
 			{
 				arguments: template ? [test, template] : [test],
-				command: debug ? "_dart.startDebuggingTestFromOutline" : "_dart.startWithoutDebuggingTestFromOutline",
+				command,
 				title: name,
 			}
 		);

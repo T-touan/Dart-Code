@@ -33,11 +33,14 @@ export class TestCommands implements vs.Disposable {
 
 	constructor(protected readonly logger: Logger, private readonly testModel: TestModel, protected readonly wsContext: WorkspaceContext, private readonly vsCodeTestController: VsCodeTestController | undefined, protected readonly dartCapabilities: DartCapabilities, protected readonly flutterCapabilities: FlutterCapabilities) {
 		this.disposables.push(
-			vs.commands.registerCommand("_dart.startDebuggingTestFromOutline", (test: TestOutlineInfo, launchTemplate: any | undefined) => this.startTestFromOutline(false, test, launchTemplate)),
-			vs.commands.registerCommand("_dart.startWithoutDebuggingTestFromOutline", (test: TestOutlineInfo, launchTemplate: any | undefined) => this.startTestFromOutline(true, test, launchTemplate)),
-			vs.commands.registerCommand("_dart.startDebuggingTestsFromVsTestController", (suiteData: SuiteData, treeNodes: Array<SuiteNode | GroupNode | TestNode>, suppressPrompts: boolean, testRun: vs.TestRun | undefined) => this.runTestsForNode(suiteData, treeNodes, true, suppressPrompts, treeNodes.length === 1 && treeNodes[0] instanceof TestNode, undefined, testRun)),
-			vs.commands.registerCommand("_dart.startWithoutDebuggingTestsFromVsTestController", (suiteData: SuiteData, treeNodes: Array<SuiteNode | GroupNode | TestNode>, suppressPrompts: boolean, testRun: vs.TestRun | undefined) => this.runTestsForNode(suiteData, treeNodes, false, suppressPrompts, treeNodes.length === 1 && treeNodes[0] instanceof TestNode, undefined, testRun)),
-			vs.commands.registerCommand("_dart.runAllTestsWithoutDebugging", (suitesToRun: SuiteNode[] | undefined, nodesToExclude: TestNode[] | undefined, testRun: vs.TestRun | undefined, isRunningAll: boolean) => this.runAllTestsWithoutDebugging(suitesToRun, nodesToExclude, testRun, isRunningAll)),
+			vs.commands.registerCommand("_dart.startDebuggingTestFromOutline", (test: TestOutlineInfo, launchTemplate: any | undefined) => this.startTestFromOutline(false, false, test, launchTemplate)),
+			vs.commands.registerCommand("_dart.startWithoutDebuggingTestFromOutline", (test: TestOutlineInfo, launchTemplate: any | undefined) => this.startTestFromOutline(true, false, test, launchTemplate)),
+			vs.commands.registerCommand("_dart.startWithoutDebuggingWithCoverageTestFromOutline", (test: TestOutlineInfo, launchTemplate: any | undefined) => this.startTestFromOutline(true, true, test, launchTemplate)),
+			vs.commands.registerCommand("_dart.startDebuggingTestsFromVsTestController", (suiteData: SuiteData, treeNodes: Array<SuiteNode | GroupNode | TestNode>, suppressPrompts: boolean, testRun: vs.TestRun | undefined) => this.runTestsForNode(suiteData, treeNodes, true, suppressPrompts, treeNodes.length === 1 && treeNodes[0] instanceof TestNode, false, undefined, testRun)),
+			vs.commands.registerCommand("_dart.startWithoutDebuggingTestsFromVsTestController", (suiteData: SuiteData, treeNodes: Array<SuiteNode | GroupNode | TestNode>, suppressPrompts: boolean, testRun: vs.TestRun | undefined) => this.runTestsForNode(suiteData, treeNodes, false, suppressPrompts, treeNodes.length === 1 && treeNodes[0] instanceof TestNode, false, undefined, testRun)),
+			vs.commands.registerCommand("_dart.startWithoutDebuggingWithCoverageTestsFromVsTestController", (suiteData: SuiteData, treeNodes: Array<SuiteNode | GroupNode | TestNode>, suppressPrompts: boolean, testRun: vs.TestRun | undefined) => this.runTestsForNode(suiteData, treeNodes, false, suppressPrompts, treeNodes.length === 1 && treeNodes[0] instanceof TestNode, true, undefined, testRun)),
+			vs.commands.registerCommand("_dart.runAllTestsWithoutDebugging", (suitesToRun: SuiteNode[] | undefined, nodesToExclude: TestNode[] | undefined, testRun: vs.TestRun | undefined, isRunningAll: boolean) => this.runAllTestsWithoutDebugging(suitesToRun, nodesToExclude, testRun, isRunningAll, false)),
+			vs.commands.registerCommand("_dart.runAllTestsWithoutDebuggingWithCoverage", (suitesToRun: SuiteNode[] | undefined, nodesToExclude: TestNode[] | undefined, testRun: vs.TestRun | undefined, isRunningAll: boolean) => this.runAllTestsWithoutDebugging(suitesToRun, nodesToExclude, testRun, isRunningAll, true)),
 			vs.commands.registerCommand("dart.goToTests", (resource: vs.Uri | undefined) => this.goToTestOrImplementationFile(resource), this),
 			vs.commands.registerCommand("dart.goToTestOrImplementationFile", () => this.goToTestOrImplementationFile(), this),
 			vs.window.onDidChangeActiveTextEditor((e) => this.updateEditorContexts(e)),
@@ -47,7 +50,7 @@ export class TestCommands implements vs.Disposable {
 		this.updateEditorContexts(vs.window.activeTextEditor);
 	}
 
-	private async runAllTestsWithoutDebugging(suites: SuiteNode[] | undefined, exclusions: TestNode[] | undefined, testRun: vs.TestRun | undefined, isRunningAll: boolean): Promise<void> {
+	private async runAllTestsWithoutDebugging(suites: SuiteNode[] | undefined, exclusions: TestNode[] | undefined, testRun: vs.TestRun | undefined, isRunningAll: boolean, withCoverage: boolean): Promise<void> {
 		// To run multiple folders/suites, we can pass the first as `program` and the rest as `args` which
 		// will be appended immediately after `program`. However, this only works for things in the same project
 		// as the first one that runs will be used for resolving package: URIs etc. We also can't mix and match
@@ -115,6 +118,7 @@ export class TestCommands implements vs.Disposable {
 
 		await Promise.all(
 			projectsWithTests.map((projectWithTests) => this.runTests({
+				coverage: withCoverage,
 				debug: false,
 				isFlutter: undefined, // unknown, runTests will compute
 				launchTemplate: {
@@ -133,7 +137,7 @@ export class TestCommands implements vs.Disposable {
 		);
 	}
 
-	private async runTestsForNode(suiteData: SuiteData, nodes: TreeNode[], debug: boolean, suppressPrompts: boolean, runSkippedTests: boolean, token?: vs.CancellationToken, testRun?: vs.TestRun) {
+	private async runTestsForNode( suiteData: SuiteData, nodes: TreeNode[], debug: boolean, withCoverage: boolean, suppressPrompts: boolean, runSkippedTests: boolean, token?: vs.CancellationToken, testRun?: vs.TestRun) {
 		const testSelection = getTestSelectionForNodes(nodes);
 		const programPath = fsPath(suiteData.path);
 		const isFlutter = isInsideFlutterProject(vs.Uri.file(suiteData.path));
@@ -141,6 +145,7 @@ export class TestCommands implements vs.Disposable {
 		const shouldRunSkippedTests = runSkippedTests && canRunSkippedTest;
 
 		return this.runTests({
+			coverage: withCoverage,
 			debug,
 			isFlutter,
 			launchTemplate: undefined,
@@ -154,7 +159,7 @@ export class TestCommands implements vs.Disposable {
 		});
 	}
 
-	private async runTests({ programPath, debug, testSelection, shouldRunSkippedTests, suppressPrompts, launchTemplate, testRun, token, useLaunchJsonTestTemplate, isFlutter }: TestLaunchInfo): Promise<boolean> {
+	private async runTests({ programPath, debug, coverage, testSelection, shouldRunSkippedTests, suppressPrompts, launchTemplate, testRun, token, useLaunchJsonTestTemplate, isFlutter }: TestLaunchInfo): Promise<boolean> {
 		if (useLaunchJsonTestTemplate) {
 			// Get the default Run/Debug template for running/debugging tests and use that as a base.
 			const template = getLaunchConfigDefaultTemplate(vs.Uri.file(programPath), debug);
@@ -189,6 +194,7 @@ export class TestCommands implements vs.Disposable {
 				suppressPrompts,
 				...getLaunchConfig(
 					!debug,
+					coverage,
 					programPath,
 					testSelection,
 					shouldRunTestsByLine,
@@ -232,12 +238,13 @@ export class TestCommands implements vs.Disposable {
 		});
 	}
 
-	private startTestFromOutline(noDebug: boolean, test: TestOutlineInfo, launchTemplate: any | undefined) {
+	private startTestFromOutline(noDebug: boolean, withCoverage: boolean, test: TestOutlineInfo, launchTemplate: any | undefined) {
 		const isFlutter = isInsideFlutterProject(vs.Uri.file(test.file));
 		const canRunSkippedTest = (this.flutterCapabilities.supportsRunSkippedTests || !isFlutter);
 		const shouldRunSkippedTests = canRunSkippedTest; // These are the same when running directly, since we always run skipped.
 
 		return this.runTests({
+			coverage: withCoverage,
 			debug: !noDebug,
 			isFlutter,
 			launchTemplate,
@@ -384,6 +391,7 @@ interface TestLaunchInfo {
 	programPath: string;
 	isFlutter: boolean | undefined;
 	debug: boolean;
+	coverage: boolean;
 	testSelection: TestSelection[] | undefined;
 	shouldRunSkippedTests: boolean;
 	suppressPrompts: boolean;

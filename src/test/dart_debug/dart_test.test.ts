@@ -301,6 +301,7 @@ describe("dart test debugger", () => {
 				const config = await getResolvedDebugConfiguration(
 					testUtils.getLaunchConfig(
 						true,
+						false,
 						fsPath(helloWorldTestDupeNameFile),
 						[{ name: "group test", isGroup: false, position: undefined }],
 						runByLine,
@@ -663,4 +664,3 @@ test/tree_test.dart [6/8 passed] Failed
 		);
 	}
 });
-
